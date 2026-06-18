@@ -2,7 +2,10 @@ name: PR Slack Notifier
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # Cron is UTC and 5 min is the GitHub Actions minimum (2 min is not possible).
+    # Window covers ~9am-8pm America/New_York across both EST and EDT (UTC-5 / UTC-4).
+    - cron: "*/5 0,13-23 * * *"   # daytime NY: every 5 minutes
+    - cron: "*/15 1-12 * * *"     # overnight NY: every 15 minutes
   workflow_dispatch:
     inputs:
       test_dm:
