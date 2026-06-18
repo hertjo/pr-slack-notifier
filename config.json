@@ -3,7 +3,7 @@
   "lookback_hours": 24,
   "repos": [],
   "username": "GitHub PR Notifier",
-  "icon_emoji": ":bufo-offers-pr:",
+  "icon_emoji": ":bufo-offers-a-pr:",
   "rules": [
     { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E" },
     { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#E8702A" },
