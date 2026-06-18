@@ -57,6 +57,9 @@ class Config:
     lookback_hours: int
     repos: list                         # allowlist of "owner/name"; empty = all repos
     rules: list
+    username: str = "GitHub PR Notifier"
+    icon_emoji: str = ""                # e.g. ":bufo-offers-pr:" (needs chat:write.customize)
+    icon_url: str = ""                  # alternative to icon_emoji: a hosted image URL
 
 
 def load_config(path):
@@ -66,6 +69,9 @@ def load_config(path):
         lookback_hours=raw.get("lookback_hours", 24),
         repos=[r.lower() for r in raw.get("repos", [])],
         rules=[Rule(**r) for r in raw["rules"]],
+        username=raw.get("username", "GitHub PR Notifier"),
+        icon_emoji=raw.get("icon_emoji", ""),
+        icon_url=raw.get("icon_url", ""),
     )
 
 
@@ -136,15 +142,40 @@ def dm_channel():
     return _dm_channel
 
 
+# Bot display name + avatar (set by set_identity from config). Empty = Slack default.
+_identity = {}
+
+
+def set_identity(cfg):
+    if cfg.icon_emoji:
+        _identity.update(username=cfg.username, icon_emoji=cfg.icon_emoji)
+    elif cfg.icon_url:
+        _identity.update(username=cfg.username, icon_url=cfg.icon_url)
+
+
+def _post_message(payload):
+    resp = _slack("chat.postMessage", payload)
+    # The custom avatar/name needs the chat:write.customize scope. If it's not added
+    # yet, retry without it so notifications still go through.
+    if not resp.get("ok") and resp.get("error") == "missing_scope" and _identity:
+        print("note: add the chat:write.customize scope to show the custom bufo icon", file=sys.stderr)
+        for key in ("username", "icon_emoji", "icon_url"):
+            payload.pop(key, None)
+        resp = _slack("chat.postMessage", payload)
+    if not resp.get("ok"):
+        print("chat.postMessage error:", resp.get("error"), file=sys.stderr)
+
+
 def slack_card(verb, repo, title, url, color):
     body = f"*{verb}*"
     ticket = TICKET_RE.search(title or "")
     if ticket:
         body += f"\n<{LINEAR_ISSUE_URL}{ticket.group(0)}|{ticket.group(0)}>"
-    resp = _slack("chat.postMessage", {
+    _post_message({
         "channel": dm_channel(),
         "unfurl_links": False,
         "unfurl_media": False,
+        **_identity,
         "attachments": [{
             "color": color,
             "author_name": repo,
@@ -154,8 +185,6 @@ def slack_card(verb, repo, title, url, color):
             "mrkdwn_in": ["text"],
         }],
     })
-    if not resp.get("ok"):
-        print("chat.postMessage error:", resp.get("error"), file=sys.stderr)
 
 
 # --------------------------------------------------------------------------- matching
@@ -191,6 +220,7 @@ def run_test(cfg):
 
 def main():
     cfg = load_config(CONFIG_FILE)
+    set_identity(cfg)
 
     if os.environ.get("TEST_DM") == "1":
         run_test(cfg)

@@ -58,6 +58,7 @@ All behavior lives in `config.json` — no code changes needed.
 - **`github_login`** — your GitHub username (used to detect "your" PRs).
 - **`lookback_hours`** — how far back to scan each run.
 - **`repos`** — allowlist of `"owner/name"`. Empty = all repos. e.g. `["airopshq/airops"]` to only watch one.
+- **`username`** / **`icon_emoji`** / **`icon_url`** — the bot's display name and avatar on each DM. `icon_emoji` uses a workspace emoji (e.g. `":bufo-offers-pr:"`); `icon_url` is a hosted image instead. **Requires the `chat:write.customize` bot scope** (OAuth & Permissions → add scope → reinstall). Until that scope is added, the bot falls back to its default icon and notifications keep working.
 - **`rules`** — evaluated top to bottom; the **first match wins**. Each rule:
   - `name` — label shown in test mode.
   - `color` — the Slack bar (hex, or `good` / `warning` / `danger`).

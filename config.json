@@ -2,6 +2,8 @@
   "github_login": "hertjo",
   "lookback_hours": 24,
   "repos": [],
+  "username": "GitHub PR Notifier",
+  "icon_emoji": ":bufo-offers-pr:",
   "rules": [
     { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E" },
     { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#E8702A" },
