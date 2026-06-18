@@ -21,6 +21,10 @@ SLACK_USER_ID = os.environ["SLACK_USER_ID"]
 STATE_FILE = os.environ.get("STATE_FILE", "state.json")
 LOOKBACK_HOURS = int(os.environ.get("LOOKBACK_HOURS", "24"))
 
+# Slack attachment colors (the bar on the left of the message)
+COLOR_MINE = "#36C5F0"    # blue: activity on your PRs / @-mentions
+COLOR_REVIEW = "#ECB22E"  # amber: someone requested YOUR review
+
 REASON_VERB = {
     "review_requested": "Review requested",
     "mention": "You were mentioned",
@@ -73,15 +77,33 @@ def pr_author(subject_url):
         return ""
 
 
-def slack_dm(text):
-    open_resp = _slack("conversations.open", {"users": SLACK_USER_ID})
-    if not open_resp.get("ok"):
-        print("conversations.open error:", open_resp.get("error"), file=sys.stderr)
-        return
-    channel = open_resp["channel"]["id"]
-    post_resp = _slack("chat.postMessage", {"channel": channel, "text": text, "unfurl_links": False})
-    if not post_resp.get("ok"):
-        print("chat.postMessage error:", post_resp.get("error"), file=sys.stderr)
+def is_my_pr(subject_url, cache):
+    if subject_url not in cache:
+        cache[subject_url] = pr_author(subject_url)
+    return cache[subject_url] == ME
+
+
+_dm_channel = None
+
+
+def dm_channel():
+    global _dm_channel
+    if _dm_channel is None:
+        resp = _slack("conversations.open", {"users": SLACK_USER_ID})
+        if not resp.get("ok"):
+            raise RuntimeError(f"conversations.open failed: {resp.get('error')}")
+        _dm_channel = resp["channel"]["id"]
+    return _dm_channel
+
+
+def slack_dm(text, color):
+    resp = _slack("chat.postMessage", {
+        "channel": dm_channel(),
+        "attachments": [{"color": color, "text": text, "mrkdwn_in": ["text"]}],
+        "unfurl_links": False,
+    })
+    if not resp.get("ok"):
+        print("chat.postMessage error:", resp.get("error"), file=sys.stderr)
 
 
 def _slack(method, payload):
@@ -99,7 +121,8 @@ def _slack(method, payload):
 
 def main():
     if os.environ.get("TEST_DM") == "1":
-        slack_dm("PR notifier test: Slack delivery works. You'll get a DM here on activity on your PRs or @-mentions.")
+        slack_dm("PR notifier test: activity on your PRs / @-mentions arrive in this color.", COLOR_MINE)
+        slack_dm("Review requests (someone needs your review) arrive in this color.", COLOR_REVIEW)
         print("sent test DM")
         return
 
@@ -127,13 +150,13 @@ def main():
         subject_url = subject.get("url") or ""
         is_pr = subject.get("type") == "PullRequest"
 
-        mine = False
-        if is_pr and subject_url:
-            if subject_url not in author_cache:
-                author_cache[subject_url] = pr_author(subject_url)
-            mine = author_cache[subject_url] == ME
-
-        if not (reason == "mention" or (is_pr and mine)):
+        if reason == "review_requested":
+            color = COLOR_REVIEW  # someone wants YOUR review (any author)
+        elif reason == "mention":
+            color = COLOR_MINE
+        elif is_pr and subject_url and is_my_pr(subject_url, author_cache):
+            color = COLOR_MINE
+        else:
             continue
 
         verb = REASON_VERB.get(reason, reason.replace("_", " ").title())
@@ -146,7 +169,7 @@ def main():
             except urllib.error.HTTPError:
                 pass
 
-        slack_dm(f"*{verb}* on <{link}|{repo} — {title}>")
+        slack_dm(f"*{verb}* on <{link}|{repo} - {title}>", color)
         sent += 1
 
     if len(state) > 2000:
