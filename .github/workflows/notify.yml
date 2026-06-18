@@ -2,10 +2,10 @@ name: PR Slack Notifier
 
 on:
   schedule:
-    # Cron is UTC and 5 min is the GitHub Actions minimum (2 min is not possible).
-    # Window covers ~9am-8pm America/New_York across both EST and EDT (UTC-5 / UTC-4).
-    - cron: "*/5 0,13-23 * * *"   # daytime NY: every 5 minutes
-    - cron: "*/15 1-12 * * *"     # overnight NY: every 15 minutes
+    # UTC. Window approximates 9am-8pm America/New_York across EST and EDT (UTC-5 / -4).
+    # Daytime: hourly trigger; the job then polls ~every 2 min for the hour (cron can't do 2 min).
+    - cron: "0 0,13-23 * * *"   # daytime NY: hourly kick-off -> internal 2-min loop
+    - cron: "*/15 1-12 * * *"   # overnight NY: single poll every 15 min
   workflow_dispatch:
     inputs:
       test_dm:
@@ -23,6 +23,7 @@ concurrency:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    timeout-minutes: 58
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +32,19 @@ jobs:
           python-version: "3.12"
 
       - name: Poll notifications and DM Slack
-        run: python notify.py
+        run: |
+          if [ "$TEST_DM" = "1" ]; then
+            python notify.py
+            exit 0
+          fi
+          h=$((10#$(date -u +%H)))
+          # Daytime scheduled runs loop ~every 2 min for the hour; everything else polls once.
+          if [ "${{ github.event_name }}" = "schedule" ] && { [ "$h" -eq 0 ] || [ "$h" -ge 13 ]; }; then
+            echo "daytime: polling ~every 2 min for the hour"
+            for i in $(seq 1 25); do python notify.py || true; sleep 120; done
+          else
+            python notify.py
+          fi
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
