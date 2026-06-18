@@ -9,10 +9,14 @@ a duplicate ping for the same event.
 """
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
+
+TICKET_RE = re.compile(r"\bAIR-\d+\b")
+LINEAR_ISSUE_URL = "https://linear.app/airops/issue/"
 
 ME = os.environ.get("GITHUB_LOGIN", "hertjo").lower()
 GH_PAT = os.environ["GH_PAT"]
@@ -96,14 +100,34 @@ def dm_channel():
     return _dm_channel
 
 
-def slack_dm(text, color):
+def slack_post(attachment):
     resp = _slack("chat.postMessage", {
         "channel": dm_channel(),
-        "attachments": [{"color": color, "text": text, "mrkdwn_in": ["text"]}],
+        "attachments": [attachment],
         "unfurl_links": False,
+        "unfurl_media": False,
     })
     if not resp.get("ok"):
         print("chat.postMessage error:", resp.get("error"), file=sys.stderr)
+
+
+def slack_text(text, color):
+    slack_post({"color": color, "text": text, "mrkdwn_in": ["text"]})
+
+
+def slack_notification(verb, repo, title, url, color):
+    body = f"*{verb}*"
+    ticket = TICKET_RE.search(title or "")
+    if ticket:
+        body += f"\n<{LINEAR_ISSUE_URL}{ticket.group(0)}|{ticket.group(0)}>"
+    slack_post({
+        "color": color,
+        "author_name": repo,
+        "title": title or repo,
+        "title_link": url,
+        "text": body,
+        "mrkdwn_in": ["text"],
+    })
 
 
 def _slack(method, payload):
@@ -121,8 +145,10 @@ def _slack(method, payload):
 
 def main():
     if os.environ.get("TEST_DM") == "1":
-        slack_dm("PR notifier test: activity on your PRs / @-mentions arrive in this color.", COLOR_MINE)
-        slack_dm("Review requests (someone needs your review) arrive in this color.", COLOR_REVIEW)
+        slack_notification("New comment", "airopshq/airops", "[AIR-21947] Example: activity on your PRs / mentions",
+                           "https://github.com/airopshq/airops/pull/15516", COLOR_MINE)
+        slack_notification("Review requested", "airopshq/airops", "[AIR-22004] Example: someone needs your review",
+                           "https://github.com/airopshq/airops/pull/15532", COLOR_REVIEW)
         print("sent test DM")
         return
 
@@ -169,7 +195,7 @@ def main():
             except urllib.error.HTTPError:
                 pass
 
-        slack_dm(f"*{verb}* on <{link}|{repo} - {title}>", color)
+        slack_notification(verb, repo, title, link, color)
         sent += 1
 
     if len(state) > 2000:
