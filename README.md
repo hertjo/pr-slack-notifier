@@ -47,10 +47,13 @@ All behavior lives in `config.json` — no code changes needed.
   "github_login": "hertjo",
   "lookback_hours": 24,
   "repos": [],
+  "username": "GitHub PR Notifier",
+  "icon_emoji": ":bufo-offers-a-pr:",
   "rules": [
-    { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E" },
-    { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#36C5F0" },
-    { "name": "Your PRs", "authored_by_me": true, "color": "#36C5F0" }
+    { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E", "icon_emoji": ":bufo-offers-a-pr:" },
+    { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#E8702A", "icon_emoji": ":bufo-shows-mention-on-pr:" },
+    { "name": "Comments on your PRs", "authored_by_me": true, "is_comment": true, "color": "#36C5F0", "icon_emoji": ":bufo-shows-pr-comments:" },
+    { "name": "Your PRs", "authored_by_me": true, "color": "#36C5F0", "icon_emoji": ":bufo-shows-pr:" }
   ]
 }
 ```
@@ -58,12 +61,14 @@ All behavior lives in `config.json` — no code changes needed.
 - **`github_login`** — your GitHub username (used to detect "your" PRs).
 - **`lookback_hours`** — how far back to scan each run.
 - **`repos`** — allowlist of `"owner/name"`. Empty = all repos. e.g. `["airopshq/airops"]` to only watch one.
-- **`username`** / **`icon_emoji`** / **`icon_url`** — the bot's display name and avatar on each DM. `icon_emoji` uses a workspace emoji (e.g. `":bufo-offers-pr:"`); `icon_url` is a hosted image instead. **Requires the `chat:write.customize` bot scope** (OAuth & Permissions → add scope → reinstall). Until that scope is added, the bot falls back to its default icon and notifications keep working.
+- **`username`** / **`icon_emoji`** / **`icon_url`** — the bot's default display name and avatar. `icon_emoji` is a workspace emoji (e.g. `":bufo-offers-a-pr:"`); `icon_url` is a hosted image instead. Any rule can override the emoji per type (below). **Requires the `chat:write.customize` bot scope** (OAuth & Permissions → add scope → reinstall). Until that scope is added, the bot falls back to its default icon and notifications keep working. Emoji names must exist in your workspace.
 - **`rules`** — evaluated top to bottom; the **first match wins**. Each rule:
   - `name` — label shown in test mode.
   - `color` — the Slack bar (hex, or `good` / `warning` / `danger`).
+  - `icon_emoji` — avatar for this notification type (e.g. a per-type bufo). Omit = use the top-level `icon_emoji`.
   - `reasons` — match these GitHub notification reasons (`review_requested`, `mention`, `team_mention`, `comment`, `state_change`, `ci_activity`, ...). Omit = any reason.
   - `authored_by_me` — `true` = only PRs you authored, `false` = only PRs you did not. Omit = don't care.
+  - `is_comment` — `true` = only comment activity (a heuristic on the latest comment), `false` = exclude comments. Omit = don't care. Put a `true` rule above your catch-all so comments get their own emoji.
   - `label` — override the displayed verb. Omit = derived from the reason.
 
 Examples:

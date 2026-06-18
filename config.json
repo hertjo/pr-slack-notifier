@@ -5,8 +5,9 @@
   "username": "GitHub PR Notifier",
   "icon_emoji": ":bufo-offers-a-pr:",
   "rules": [
-    { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E" },
-    { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#E8702A" },
-    { "name": "Your PRs", "authored_by_me": true, "color": "#36C5F0" }
+    { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E", "icon_emoji": ":bufo-offers-a-pr:" },
+    { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#E8702A", "icon_emoji": ":bufo-shows-mention-on-pr:" },
+    { "name": "Comments on your PRs", "authored_by_me": true, "is_comment": true, "color": "#36C5F0", "icon_emoji": ":bufo-shows-pr-comments:" },
+    { "name": "Your PRs", "authored_by_me": true, "color": "#36C5F0", "icon_emoji": ":bufo-shows-pr:" }
   ]
 }

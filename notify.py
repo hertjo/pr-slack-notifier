@@ -48,6 +48,8 @@ class Rule:
     name: str = ""                      # category name, shown in test mode
     reasons: list | None = None         # match these GitHub reasons; None = any
     authored_by_me: bool | None = None  # require (or exclude) PRs you authored
+    is_comment: bool | None = None       # match (or exclude) comment activity
+    icon_emoji: str = ""                # per-type avatar; falls back to the global icon_emoji
     label: str | None = None            # override the displayed verb (else from reason)
 
 
@@ -142,23 +144,34 @@ def dm_channel():
     return _dm_channel
 
 
-# Bot display name + avatar (set by set_identity from config). Empty = Slack default.
-_identity = {}
+# Bot display name + default avatar, set from config in main(). A rule's own
+# icon_emoji overrides ICON_EMOJI per message.
+USERNAME = "GitHub PR Notifier"
+ICON_EMOJI = ""
+ICON_URL = ""
 
 
 def set_identity(cfg):
-    if cfg.icon_emoji:
-        _identity.update(username=cfg.username, icon_emoji=cfg.icon_emoji)
-    elif cfg.icon_url:
-        _identity.update(username=cfg.username, icon_url=cfg.icon_url)
+    global USERNAME, ICON_EMOJI, ICON_URL
+    USERNAME, ICON_EMOJI, ICON_URL = cfg.username, cfg.icon_emoji, cfg.icon_url
+
+
+def identity_for(icon_emoji):
+    """Bot username + avatar for one message. Per-rule emoji wins, else the default."""
+    emoji = icon_emoji or ICON_EMOJI
+    if emoji:
+        return {"username": USERNAME, "icon_emoji": emoji}
+    if ICON_URL:
+        return {"username": USERNAME, "icon_url": ICON_URL}
+    return {}
 
 
 def _post_message(payload):
     resp = _slack("chat.postMessage", payload)
-    # The custom avatar/name needs the chat:write.customize scope. If it's not added
+    # The custom avatar/name needs the chat:write.customize scope. If it isn't added
     # yet, retry without it so notifications still go through.
-    if not resp.get("ok") and resp.get("error") == "missing_scope" and _identity:
-        print("note: add the chat:write.customize scope to show the custom bufo icon", file=sys.stderr)
+    if not resp.get("ok") and resp.get("error") == "missing_scope":
+        print("note: add the chat:write.customize scope to show the custom icon", file=sys.stderr)
         for key in ("username", "icon_emoji", "icon_url"):
             payload.pop(key, None)
         resp = _slack("chat.postMessage", payload)
@@ -166,7 +179,7 @@ def _post_message(payload):
         print("chat.postMessage error:", resp.get("error"), file=sys.stderr)
 
 
-def slack_card(verb, repo, title, url, color):
+def slack_card(verb, repo, title, url, color, icon_emoji=""):
     body = f"*{verb}*"
     ticket = TICKET_RE.search(title or "")
     if ticket:
@@ -175,7 +188,7 @@ def slack_card(verb, repo, title, url, color):
         "channel": dm_channel(),
         "unfurl_links": False,
         "unfurl_media": False,
-        **_identity,
+        **identity_for(icon_emoji),
         "attachments": [{
             "color": color,
             "author_name": repo,
@@ -188,6 +201,11 @@ def slack_card(verb, repo, title, url, color):
 
 
 # --------------------------------------------------------------------------- matching
+def is_comment(notif):
+    """True when the latest activity on the thread is a comment (vs review / merge / etc.)."""
+    return "/comments/" in (notif.get("subject", {}).get("latest_comment_url") or "")
+
+
 def match(notif, cfg, author_cache):
     """Return the first Rule that matches this notification, or None."""
     reason = notif.get("reason", "")
@@ -195,6 +213,8 @@ def match(notif, cfg, author_cache):
     is_pr = subject.get("type") == "PullRequest"
     for rule in cfg.rules:
         if rule.reasons is not None and reason not in rule.reasons:
+            continue
+        if rule.is_comment is not None and is_comment(notif) != rule.is_comment:
             continue
         if rule.authored_by_me is not None:
             mine = bool(is_pr and subject.get("url")
@@ -214,7 +234,7 @@ def run_test(cfg):
     for rule in cfg.rules:
         label = rule.label or rule.name or "Example"
         slack_card(label, "owner/repo", f"[AIR-0000] Example: {rule.name or label}",
-                   "https://github.com", rule.color)
+                   "https://github.com", rule.color, rule.icon_emoji)
     print(f"sent {len(cfg.rules)} test cards")
 
 
@@ -257,7 +277,7 @@ def main():
             except urllib.error.HTTPError:
                 pass
 
-        slack_card(verb_for(rule, n.get("reason", "")), repo, subject.get("title", ""), url, rule.color)
+        slack_card(verb_for(rule, n.get("reason", "")), repo, subject.get("title", ""), url, rule.color, rule.icon_emoji)
         sent += 1
 
     if len(state) > 2000:
