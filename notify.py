@@ -96,6 +96,11 @@ def _slack(method, payload):
 
 
 def main():
+    if os.environ.get("TEST_DM") == "1":
+        slack_dm("PR notifier test: Slack delivery works. You'll get a DM here on activity on your PRs or @-mentions.")
+        print("sent test DM")
+        return
+
     state = {}
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE) as f:

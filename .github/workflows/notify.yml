@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+    inputs:
+      test_dm:
+        description: "Send a one-off test DM and exit"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,6 +34,7 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
           SLACK_USER_ID: ${{ secrets.SLACK_USER_ID }}
           GITHUB_LOGIN: hertjo
+          TEST_DM: ${{ github.event.inputs.test_dm == 'true' && '1' || '' }}
 
       - name: Persist state
         run: |
