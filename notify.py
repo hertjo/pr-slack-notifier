@@ -67,7 +67,9 @@ def api_to_html(url):
 def pr_author(subject_url):
     try:
         return gh(subject_url).get("user", {}).get("login", "").lower()
-    except urllib.error.HTTPError:
+    except urllib.error.HTTPError as e:
+        print(f"WARN: could not read {subject_url} (HTTP {e.code}) -- "
+              f"token likely lacks repo access / SSO authorization for that org", file=sys.stderr)
         return ""
 
 
