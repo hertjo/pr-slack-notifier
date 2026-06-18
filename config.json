@@ -1,0 +1,10 @@
+{
+  "github_login": "hertjo",
+  "lookback_hours": 24,
+  "repos": [],
+  "rules": [
+    { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E" },
+    { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#36C5F0" },
+    { "name": "Your PRs", "authored_by_me": true, "color": "#36C5F0" }
+  ]
+}

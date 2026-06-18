@@ -38,8 +38,40 @@ GitHub → Settings → **Notifications** → turn **off** email, keep the **web
 ### 7. Seed and go
 Actions tab → **PR Slack Notifier** → **Run workflow**. The first run just seeds state silently (no flood). After that it runs every 5 minutes on its own.
 
-## Tweaks
-- `GITHUB_LOGIN` (in `.github/workflows/notify.yml`) — set to your GitHub login. Defaults to `hertjo`.
-- Cadence — change the `cron` (5 min is GitHub's minimum).
-- Want it on *every* PR you're subscribed to, not just yours? Drop the `is_pr and mine` check in `notify.py`.
-- `LOOKBACK_HOURS` env — how far back to scan each run (default 24).
+## Configuration (`config.json`)
+
+All behavior lives in `config.json` — no code changes needed.
+
+```json
+{
+  "github_login": "hertjo",
+  "lookback_hours": 24,
+  "repos": [],
+  "rules": [
+    { "name": "Review requested", "reasons": ["review_requested"], "color": "#ECB22E" },
+    { "name": "Mentions", "reasons": ["mention", "team_mention"], "color": "#36C5F0" },
+    { "name": "Your PRs", "authored_by_me": true, "color": "#36C5F0" }
+  ]
+}
+```
+
+- **`github_login`** — your GitHub username (used to detect "your" PRs).
+- **`lookback_hours`** — how far back to scan each run.
+- **`repos`** — allowlist of `"owner/name"`. Empty = all repos. e.g. `["airopshq/airops"]` to only watch one.
+- **`rules`** — evaluated top to bottom; the **first match wins**. Each rule:
+  - `name` — label shown in test mode.
+  - `color` — the Slack bar (hex, or `good` / `warning` / `danger`).
+  - `reasons` — match these GitHub notification reasons (`review_requested`, `mention`, `team_mention`, `comment`, `state_change`, `ci_activity`, ...). Omit = any reason.
+  - `authored_by_me` — `true` = only PRs you authored, `false` = only PRs you did not. Omit = don't care.
+  - `label` — override the displayed verb. Omit = derived from the reason.
+
+Examples:
+- Only your PRs + review requests, nothing else → that's the default above.
+- Add a separate red bar for CI failures on your PRs → add `{ "name": "CI", "reasons": ["ci_activity"], "authored_by_me": true, "color": "danger" }` (put it above the "Your PRs" rule so it wins).
+- Limit to one repo → set `"repos": ["airopshq/airops"]`.
+
+Edit `config.json`, commit, push — the next run picks it up. Run the workflow with **test_dm** to see one sample card per rule in its color.
+
+## Other knobs
+- **Cadence / hours** — in `.github/workflows/notify.yml`: the daytime loop count + `sleep`, and the two `cron` lines (UTC; ~9am-8pm NY at ~2 min, overnight at 15 min).
+- Secrets (`GH_PAT`, `SLACK_BOT_TOKEN`, `SLACK_USER_ID`) stay in GitHub Actions secrets, never in `config.json`.
