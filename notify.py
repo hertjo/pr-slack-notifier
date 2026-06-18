@@ -180,7 +180,9 @@ def _post_message(payload):
 
 
 def slack_card(verb, repo, title, url, color, icon_emoji=""):
-    body = f"*{verb}*"
+    # The emoji is also the message avatar, but Slack groups consecutive messages
+    # and shows only the first one's avatar -- so put it inline too, always visible.
+    body = f"{icon_emoji} *{verb}*" if icon_emoji else f"*{verb}*"
     ticket = TICKET_RE.search(title or "")
     if ticket:
         body += f"\n<{LINEAR_ISSUE_URL}{ticket.group(0)}|{ticket.group(0)}>"
